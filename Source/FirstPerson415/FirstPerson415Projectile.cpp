@@ -2,7 +2,10 @@
 
 #include "FirstPerson415Projectile.h"
 #include "GameFramework/ProjectileMovementComponent.h"
+#include <Kismet/KismetMathLibrary.h>
+#include <Kismet/GameplayStatics.h>
 #include "Components/SphereComponent.h"
+#include "Components/DecalComponent.h"
 
 AFirstPerson415Projectile::AFirstPerson415Projectile() 
 {
@@ -16,8 +19,13 @@ AFirstPerson415Projectile::AFirstPerson415Projectile()
 	CollisionComp->SetWalkableSlopeOverride(FWalkableSlopeOverride(WalkableSlope_Unwalkable, 0.f));
 	CollisionComp->CanCharacterStepUpOn = ECB_No;
 
+	// Setup Ball Mesh
+	BallMesh = CreateDefaultSubobject<UStaticMeshComponent>("BallMesh");
+
 	// Set as root component
 	RootComponent = CollisionComp;
+
+	BallMesh->SetupAttachment(CollisionComp);
 
 	// Use a ProjectileMovementComponent to govern this projectile's movement
 	ProjectileMovement = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileComp"));
@@ -31,13 +39,83 @@ AFirstPerson415Projectile::AFirstPerson415Projectile()
 	InitialLifeSpan = 3.0f;
 }
 
+void AFirstPerson415Projectile::BeginPlay()
+{
+	Super::BeginPlay();
+	// Create Dynamic Material Instance for projectile
+
+	// Generate a random color; this will be used for both the projectile and the decal
+	float red = UKismetMathLibrary::RandomFloatInRange(0.0f, 1.0f);
+	float green = UKismetMathLibrary::RandomFloatInRange(0.0f, 1.0f);
+	float blue = UKismetMathLibrary::RandomFloatInRange(0.0f, 1.0f);
+	RandomColor = FLinearColor(red, green, blue, 1.0f);
+
+	if (ProjectileMaterial == nullptr || BallMesh == nullptr)
+	{
+		return;
+	}
+
+	DynamicMaterial = UMaterialInstanceDynamic::Create(ProjectileMaterial, this);
+	BallMesh->SetMaterial(0, DynamicMaterial);
+	DynamicMaterial->SetVectorParameterValue(FName(TEXT("Color")), RandomColor);
+}
+
 void AFirstPerson415Projectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
-	// Only add impulse and destroy projectile if we hit a physics
-	if ((OtherActor != nullptr) && (OtherActor != this) && (OtherComp != nullptr) && OtherComp->IsSimulatingPhysics())
+	// Defensive checks common to all paths
+	if (OtherActor == nullptr)
+	{
+		return;
+	}
+
+	const float Frame = FMath::FRandRange(0.0f, 3.0f);
+	const FVector DecalSize = FVector(FMath::FRandRange(20.0f, 40.0f));
+
+	// Ensure we have a valid world and material before trying to spawn a decal
+	UWorld* World = GetWorld();
+	if (!World || BallMaterial == nullptr)
+	{
+		// If we hit a physics object still apply impulse, then destroy if appropriate
+		if (OtherComp != nullptr && OtherComp->IsSimulatingPhysics())
+		{
+			OtherComp->AddImpulseAtLocation(GetVelocity() * 100.0f, GetActorLocation());
+			Destroy();
+		}
+		return;
+	}
+
+	// If we hit something with physics, apply impulse first
+	if (OtherComp != nullptr && OtherComp->IsSimulatingPhysics())
 	{
 		OtherComp->AddImpulseAtLocation(GetVelocity() * 100.0f, GetActorLocation());
+	}
 
+	// Spawn the decal only after we've validated BallMaterial and World
+	UDecalComponent* Decal = UGameplayStatics::SpawnDecalAtLocation(
+		World,
+		BallMaterial,
+		DecalSize,
+		Hit.ImpactPoint,
+		Hit.ImpactNormal.Rotation(),
+		0.0f
+	);
+
+	// Check spawn success
+	if (Decal != nullptr)
+	{
+		UMaterialInstanceDynamic* MatInstance = Decal->CreateDynamicMaterialInstance();
+		if (MatInstance != nullptr)
+		{
+			// Use FName and FLinearColor to match Unreal API expectations
+			MatInstance->SetVectorParameterValue(FName(TEXT("Color")), RandomColor);
+			MatInstance->SetScalarParameterValue(FName(TEXT("Frame")), Frame);
+		}
+	}
+
+	// If we hit a physics-simulating component we want to destroy the projectile.
+	// Do this after decal spawn so we don't access a partially-destroyed actor while spawning.
+	if (OtherComp != nullptr && OtherComp->IsSimulatingPhysics())
+	{
 		Destroy();
 	}
 }
