@@ -42,7 +42,6 @@ AFirstPerson415Projectile::AFirstPerson415Projectile()
 void AFirstPerson415Projectile::BeginPlay()
 {
 	Super::BeginPlay();
-	// Create Dynamic Material Instance for projectile
 
 	// Generate a random color; this will be used for both the projectile and the decal
 	float red = UKismetMathLibrary::RandomFloatInRange(0.0f, 1.0f);
@@ -50,11 +49,13 @@ void AFirstPerson415Projectile::BeginPlay()
 	float blue = UKismetMathLibrary::RandomFloatInRange(0.0f, 1.0f);
 	RandomColor = FLinearColor(red, green, blue, 1.0f);
 
+	// Make sure we have valid material and mesh before trying to create dynamic material
 	if (ProjectileMaterial == nullptr || BallMesh == nullptr)
 	{
 		return;
 	}
 
+	// Create dynamic material instance and set the color parameter
 	DynamicMaterial = UMaterialInstanceDynamic::Create(ProjectileMaterial, this);
 	BallMesh->SetMaterial(0, DynamicMaterial);
 	DynamicMaterial->SetVectorParameterValue(FName(TEXT("Color")), RandomColor);
@@ -68,12 +69,13 @@ void AFirstPerson415Projectile::OnHit(UPrimitiveComponent* HitComp, AActor* Othe
 		return;
 	}
 
+	// Generate random frame and decal size
 	const float Frame = FMath::FRandRange(0.0f, 3.0f);
 	const FVector DecalSize = FVector(FMath::FRandRange(20.0f, 40.0f));
 
 	// Ensure we have a valid world and material before trying to spawn a decal
 	UWorld* World = GetWorld();
-	if (!World || BallMaterial == nullptr)
+	if (!World || SplatMaterial == nullptr)
 	{
 		// If we hit a physics object still apply impulse, then destroy if appropriate
 		if (OtherComp != nullptr && OtherComp->IsSimulatingPhysics())
@@ -93,7 +95,7 @@ void AFirstPerson415Projectile::OnHit(UPrimitiveComponent* HitComp, AActor* Othe
 	// Spawn the decal only after we've validated BallMaterial and World
 	UDecalComponent* Decal = UGameplayStatics::SpawnDecalAtLocation(
 		World,
-		BallMaterial,
+		SplatMaterial,
 		DecalSize,
 		Hit.ImpactPoint,
 		Hit.ImpactNormal.Rotation(),
@@ -103,10 +105,11 @@ void AFirstPerson415Projectile::OnHit(UPrimitiveComponent* HitComp, AActor* Othe
 	// Check spawn success
 	if (Decal != nullptr)
 	{
+		// Create dynamic material instance for decal
 		UMaterialInstanceDynamic* MatInstance = Decal->CreateDynamicMaterialInstance();
 		if (MatInstance != nullptr)
 		{
-			// Use FName and FLinearColor to match Unreal API expectations
+			// Set the decal color and frame parameters
 			MatInstance->SetVectorParameterValue(FName(TEXT("Color")), RandomColor);
 			MatInstance->SetScalarParameterValue(FName(TEXT("Frame")), Frame);
 		}
