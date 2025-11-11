@@ -6,6 +6,8 @@
 #include <Kismet/GameplayStatics.h>
 #include "Components/SphereComponent.h"
 #include "Components/DecalComponent.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraComponent.h"
 
 AFirstPerson415Projectile::AFirstPerson415Projectile() 
 {

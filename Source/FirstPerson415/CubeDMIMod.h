@@ -7,6 +7,8 @@
 #include "Components/BoxComponent.h"
 #include "CubeDMIMod.generated.h"
 
+class UNiagaraSystem;
+
 UCLASS()
 class FIRSTPERSON415_API ACubeDMIMod : public AActor
 {
@@ -35,6 +37,10 @@ public:
 
 	UPROPERTY()
 	UMaterialInstanceDynamic* DynamicMaterialInstance;
+
+	// Niagara particle system color property
+	UPROPERTY(EditAnywhere, Category = Effects)
+	UNiagaraSystem* ColorP;
 
 	UFUNCTION()
 	void OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
