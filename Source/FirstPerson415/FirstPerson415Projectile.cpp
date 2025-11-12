@@ -94,6 +94,27 @@ void AFirstPerson415Projectile::OnHit(UPrimitiveComponent* HitComp, AActor* Othe
 		OtherComp->AddImpulseAtLocation(GetVelocity() * 100.0f, GetActorLocation());
 	}
 
+	// Spawn niagara particle system at hit location
+	if (ColorP != nullptr)
+	{
+		UNiagaraComponent* NiagaraComp = UNiagaraFunctionLibrary::SpawnSystemAttached(
+			ColorP,
+			HitComp,
+			NAME_None,
+			FVector(-20.f, 0.f, 0.f),
+			FRotator(0.f),
+			EAttachLocation::KeepRelativeOffset,
+			true
+		);
+
+		if (NiagaraComp != nullptr)
+		{
+			NiagaraComp->SetVariableLinearColor(FName("RandColor"), RandomColor);
+			BallMesh->DestroyComponent();
+			CollisionComp->BodyInstance.SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		}
+	}
+
 	// Spawn the decal only after we've validated BallMaterial and World
 	UDecalComponent* Decal = UGameplayStatics::SpawnDecalAtLocation(
 		World,

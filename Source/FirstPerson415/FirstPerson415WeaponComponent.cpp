@@ -12,6 +12,8 @@
 #include "Animation/AnimInstance.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraComponent.h"
 
 // Sets default values for this component's properties
 UFirstPerson415WeaponComponent::UFirstPerson415WeaponComponent()
@@ -63,6 +65,22 @@ void UFirstPerson415WeaponComponent::Fire()
 		{
 			AnimInstance->Montage_Play(FireAnimation, 1.f);
 		}
+	}
+
+	// Spawn muzzle flash
+	if (MuzzleFlash != nullptr)
+	{
+		UNiagaraComponent* NiagaraComp = UNiagaraFunctionLibrary::SpawnSystemAttached(
+			MuzzleFlash,
+			this,
+			FName(TEXT("Muzzle")),
+			MuzzleOffset,
+			FRotator(0.f, 0.f, 0.f),
+			EAttachLocation::KeepRelativeOffset,
+			true,
+			true,
+			ENCPoolMethod::AutoRelease,
+			true);
 	}
 }
 

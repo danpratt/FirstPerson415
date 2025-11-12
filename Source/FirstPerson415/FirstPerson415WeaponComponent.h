@@ -7,6 +7,7 @@
 #include "FirstPerson415WeaponComponent.generated.h"
 
 class AFirstPerson415Character;
+class UNiagaraSystem;
 
 UCLASS(Blueprintable, BlueprintType, ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class FIRSTPERSON415_API UFirstPerson415WeaponComponent : public USkeletalMeshComponent
@@ -29,6 +30,10 @@ public:
 	/** Gun muzzle's offset from the characters location */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Gameplay)
 	FVector MuzzleOffset;
+
+	/** Muzzle Flash Particle System */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
+	UNiagaraSystem* MuzzleFlash;
 
 	/** MappingContext */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category=Input, meta=(AllowPrivateAccess = "true"))
