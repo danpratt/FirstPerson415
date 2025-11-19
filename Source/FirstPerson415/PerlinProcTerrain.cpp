@@ -80,7 +80,7 @@ void APerlinProcTerrain::CreateVertices()
 			// Calculate Z value using Perlin noise
 			float Z = FMath::PerlinNoise2D(FVector2D(x * NoiseScale + 0.1, 
 				y * NoiseScale + 0.1)) * NoiseMultiplier;
-			GEngine->AddOnScreenDebugMessage(-1, 999.0f, FColor::Yellow, FString::Printf(TEXT("Z: %f"), Z));
+			//GEngine->AddOnScreenDebugMessage(-1, 999.0f, FColor::Yellow, FString::Printf(TEXT("Z: %f"), Z));
 			Vertices.Add(FVector(x * TerrainScale, y * TerrainScale, Z));
 			UV0.Add(FVector2D(x * UVScale, y * UVScale));
 		}
