@@ -8,6 +8,7 @@
 #include "Components/DecalComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraComponent.h"
+#include "PerlinProcTerrain.h"
 
 AFirstPerson415Projectile::AFirstPerson415Projectile() 
 {
@@ -135,6 +136,14 @@ void AFirstPerson415Projectile::OnHit(UPrimitiveComponent* HitComp, AActor* Othe
 			// Set the decal color and frame parameters
 			MatInstance->SetVectorParameterValue(FName(TEXT("Color")), RandomColor);
 			MatInstance->SetScalarParameterValue(FName(TEXT("Frame")), Frame);
+
+			APerlinProcTerrain* Terrain = Cast<APerlinProcTerrain>(OtherActor);
+
+			if (Terrain)
+			{
+				// If we hit the procedural terrain, alter the mesh at the impact point
+				Terrain->AlterMesh(Hit.ImpactPoint);
+			}
 		}
 	}
 
