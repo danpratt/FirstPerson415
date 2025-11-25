@@ -62,6 +62,10 @@ protected:
 	// End of APawn interface
 
 public:
+	// For teleporting
+	UPROPERTY(EditAnywhere, Category = "Teleportation")
+	bool IsTeleporting;
+
 	/** Returns Mesh1P subobject **/
 	USkeletalMeshComponent* GetMesh1P() const { return Mesh1P; }
 	/** Returns FirstPersonCameraComponent subobject **/
