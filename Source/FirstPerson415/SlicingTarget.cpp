@@ -25,7 +25,7 @@ ASlicingTarget::ASlicingTarget()
 	ProcMeshComp->SetSimulatePhysics(true);
 	ProcMeshComp->SetCollisionObjectType(ECC_PhysicsBody);
 	ProcMeshComp->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	ProcMeshComp->bUseComplexAsSimpleCollision = true;
+	ProcMeshComp->bUseComplexAsSimpleCollision = false;
 }
 
 void ASlicingTarget::BeginPlay()
@@ -52,16 +52,18 @@ void ASlicingTarget::BeginPlay()
 
 void ASlicingTarget::Slice(FVector PlanePosition, FVector PlaneNormal)
 {
-	// Create the new component
+	// Create "Other Half" Component
 	UProceduralMeshComponent* OtherHalf = NewObject<UProceduralMeshComponent>(this);
 	OtherHalf->RegisterComponent();
 	OtherHalf->AttachToComponent(GetRootComponent(), FAttachmentTransformRules::SnapToTargetNotIncludingScale);
-
-	// Copy transforms so they match perfectly before the cut
 	OtherHalf->SetWorldLocation(ProcMeshComp->GetComponentLocation());
 	OtherHalf->SetWorldRotation(ProcMeshComp->GetComponentRotation());
 
-	// Perform the Slice
+	// Copy materials
+	OtherHalf->SetMaterial(0, ProcMeshComp->GetMaterial(0));
+	OtherHalf->SetMaterial(1, ProcMeshComp->GetMaterial(1));
+
+	// Perform Slice
 	UKismetProceduralMeshLibrary::SliceProceduralMesh(
 		ProcMeshComp,
 		PlanePosition,
@@ -72,17 +74,42 @@ void ASlicingTarget::Slice(FVector PlanePosition, FVector PlaneNormal)
 		CapMaterial
 	);
 
-	// Enable Physics on the New Half
-	OtherHalf->bUseComplexAsSimpleCollision = true; // Use the triangles we just made
-	OtherHalf->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	OtherHalf->SetCollisionObjectType(ECC_PhysicsBody);
-	OtherHalf->SetSimulatePhysics(true);
+	ProcMeshComp->bUseComplexAsSimpleCollision = false;
+	ProcMeshComp->ClearCollisionConvexMeshes(); // Remove old box shape
 
-	// Re-Enable Physics on the Original Half
-	ProcMeshComp->bUseComplexAsSimpleCollision = true;
+	FProcMeshSection* Section = ProcMeshComp->GetProcMeshSection(0);
+	if (Section)
+	{
+		TArray<FVector> CollisionVertices;
+		for (const FProcMeshVertex& Vert : Section->ProcVertexBuffer)
+		{
+			CollisionVertices.Add(Vert.Position);
+		}
+		ProcMeshComp->AddCollisionConvexMesh(CollisionVertices);
+	}
+
+	OtherHalf->bUseComplexAsSimpleCollision = false;
+	OtherHalf->ClearCollisionConvexMeshes();
+
+	FProcMeshSection* OtherSection = OtherHalf->GetProcMeshSection(0);
+	if (OtherSection)
+	{
+		TArray<FVector> CollisionVertices;
+		for (const FProcMeshVertex& Vert : OtherSection->ProcVertexBuffer)
+		{
+			CollisionVertices.Add(Vert.Position);
+		}
+		OtherHalf->AddCollisionConvexMesh(CollisionVertices);
+	}
+
+	// Enable Physics (Now that shapes exist)
 	ProcMeshComp->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	ProcMeshComp->SetCollisionObjectType(ECC_PhysicsBody);
 	ProcMeshComp->SetSimulatePhysics(true);
+
+	OtherHalf->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	OtherHalf->SetCollisionObjectType(ECC_PhysicsBody);
+	OtherHalf->SetSimulatePhysics(true);
 
 	// Apply Impulse
 	FVector Impulse = PlaneNormal * 500.0f;

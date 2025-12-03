@@ -112,7 +112,6 @@ void AFirstPerson415Projectile::OnHit(UPrimitiveComponent* HitComp, AActor* Othe
 		if (NiagaraComp != nullptr)
 		{
 			NiagaraComp->SetVariableLinearColor(FName("RandColor"), RandomColor);
-			BallMesh->DestroyComponent();
 			CollisionComp->BodyInstance.SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		}
 	}
