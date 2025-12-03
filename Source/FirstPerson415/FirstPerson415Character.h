@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
+#include "Components/SceneCaptureComponent2D.h"
 #include "FirstPerson415Character.generated.h"
 
 class UInputComponent;
@@ -70,6 +71,10 @@ public:
 	USkeletalMeshComponent* GetMesh1P() const { return Mesh1P; }
 	/** Returns FirstPersonCameraComponent subobject **/
 	UCameraComponent* GetFirstPersonCameraComponent() const { return FirstPersonCameraComponent; }
+
+	// Minimap Camera
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Minimap")
+	USceneCaptureComponent2D* MinimapCapture;
 
 };
 

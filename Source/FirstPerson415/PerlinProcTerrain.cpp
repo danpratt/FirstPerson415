@@ -49,6 +49,9 @@ void APerlinProcTerrain::Tick(float DeltaTime)
 
 void APerlinProcTerrain::AlterMesh(FVector ImpactPoint)
 {
+	// Local variable to track if we actually changed anything
+	bool bHasChanged = false;
+
 	// Function to alter the mesh at the impact point
 	for (int i = 0; i < Vertices.Num(); i++)
 	{
@@ -57,16 +60,25 @@ void APerlinProcTerrain::AlterMesh(FVector ImpactPoint)
 		if (FVector(Vertices[i] - TempVector).Size() < Radius)
 		{
 			// Lower the vertex by Depth
+			// Assuming Depth is an FVector like FVector(0,0,10). 
+			// If Depth is a float, you probably want: Vertices[i].Z -= Depth;
 			Vertices[i] = Vertices[i] - Depth;
-			// Update the mesh section
-			ProcMesh->UpdateMeshSection(
-				SectionID, 
-				Vertices, 
-				Normals, 
-				UV0, 
-				UpVertexColors, 
-				TArray<FProcMeshTangent>());
+
+			// Mark that we made a change
+			bHasChanged = true;
 		}
+	}
+
+	// Update the mesh ONLY ONCE, and ONLY if we changed something ---
+	if (bHasChanged)
+	{
+		ProcMesh->UpdateMeshSection(
+			SectionID,
+			Vertices,
+			Normals,
+			UV0,
+			UpVertexColors,
+			TArray<FProcMeshTangent>());
 	}
 }
 

@@ -1,100 +1,69 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "SlicingTarget.h"
-#include "KismetProceduralMeshLibrary.h" // Required for slicing and box generation
-#include "TimerManager.h" // Add at top with other includes
+#include "KismetProceduralMeshLibrary.h"
+#include "Components/StaticMeshComponent.h"
 
-// In the constructor, stop enabling simulation immediately so physics doesn't start
-// before world/terrain collision is ready.
 ASlicingTarget::ASlicingTarget()
 {
 	PrimaryActorTick.bCanEverTick = false;
 
-	// 1. Setup the Procedural Mesh
-	ProcMesh = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("ProcMesh"));
-	RootComponent = ProcMesh;
+	// Setup Root
+	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 
-	// Enable physics so the target (and its slices) can fall
-	ProcMesh->bUseComplexAsSimpleCollision = false; // Required for physics on proc meshes
+	// Setup Source Mesh (Standard Cube)
+	StaticMeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("StaticMesh"));
+	StaticMeshComp->SetupAttachment(RootComponent);
+	// We disable collision on the source because the ProcMesh handles it
+	StaticMeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-	// Do NOT enable simulate physics here. Enabling in constructor can start simulation
-	// before other actors (terrain) finish creating collision and cause objects to fall through.
-	// ProcMesh->SetSimulatePhysics(true);
+	// Setup Proc Mesh (The sliceable one)
+	ProcMeshComp = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("ProcMesh"));
+	ProcMeshComp->SetupAttachment(RootComponent);
 
-	ProcMesh->SetCollisionObjectType(ECC_PhysicsBody);
+	// Allow physics simulation
+	ProcMeshComp->SetSimulatePhysics(true);
+	ProcMeshComp->SetCollisionObjectType(ECC_PhysicsBody);
+	ProcMeshComp->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	ProcMeshComp->bUseComplexAsSimpleCollision = true;
 }
 
 void ASlicingTarget::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// 1. SET COLLISION PROPERTIES FIRST (before creating mesh!)
-	ProcMesh->SetMobility(EComponentMobility::Movable);
-	ProcMesh->bUseComplexAsSimpleCollision = false;
-	ProcMesh->SetCollisionObjectType(ECC_PhysicsBody);
-	ProcMesh->SetCollisionProfileName(TEXT("PhysicsActor"));
-	ProcMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-
-	// 2. Generate the Box Mesh data
-	TArray<FVector> Vertices;
-	TArray<int32> Triangles;
-	TArray<FVector> Normals;
-	TArray<FVector2D> UVs;
-	TArray<FProcMeshTangent> Tangents;
-
-	UKismetProceduralMeshLibrary::GenerateBoxMesh(FVector(50.f, 50.f, 50.f), Vertices, Triangles, Normals, UVs, Tangents);
-
-	// 3. Create the mesh section (With Collision = true)
-	ProcMesh->CreateMeshSection_LinearColor(0, Vertices, Triangles, Normals, UVs, TArray<FLinearColor>(), Tangents, true);
-
-	// 4. CRITICAL: Recreate physics state immediately after mesh creation
-	ProcMesh->RecreatePhysicsState();
-
-	// 5. Delay enabling simulation so terrain collision is ready
-	if (GetWorld())
+	// COPY THE MESH
+	// This takes whatever mesh assigned in the Blueprint
+	// and copies it into the Procedural Mesh.
+	if (StaticMeshComp->GetStaticMesh() != nullptr)
 	{
-		GetWorld()->GetTimerManager().SetTimer(EnablePhysicsTimerHandle, this, &ASlicingTarget::EnablePhysics, 0.25f, false);
-	}
-	else
-	{
-		EnablePhysics();
-	}
-}
-
-void ASlicingTarget::EnablePhysics()
-{
-	if (!ProcMesh)
-	{
-		return;
+		UKismetProceduralMeshLibrary::CopyProceduralMeshFromStaticMeshComponent(
+			StaticMeshComp,
+			0,
+			ProcMeshComp,
+			true
+		);
 	}
 
-	// Enable simulation now that collision should be ready
-	ProcMesh->SetSimulatePhysics(true);
-	ProcMesh->WakeAllRigidBodies();
+	// Hide the Source
+	// We only want to see the sliceable version
+	StaticMeshComp->SetHiddenInGame(true);
 }
 
 void ASlicingTarget::Slice(FVector PlanePosition, FVector PlaneNormal)
 {
-	// Create a new component to hold the "other half" of the slice
+	// Create the new component
 	UProceduralMeshComponent* OtherHalf = NewObject<UProceduralMeshComponent>(this);
-
-	// Attach and register
-	OtherHalf->AttachToComponent(GetRootComponent(), FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 	OtherHalf->RegisterComponent();
+	OtherHalf->AttachToComponent(GetRootComponent(), FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 
-	// Make sure it has the right mobility and collision so physics will see it
-	OtherHalf->SetMobility(EComponentMobility::Movable);
-	OtherHalf->bUseComplexAsSimpleCollision = false;
-	OtherHalf->SetCollisionProfileName(TEXT("PhysicsActor"));
-	OtherHalf->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	OtherHalf->SetCollisionObjectType(ECC_PhysicsBody);
+	// Copy transforms so they match perfectly before the cut
+	OtherHalf->SetWorldLocation(ProcMeshComp->GetComponentLocation());
+	OtherHalf->SetWorldRotation(ProcMeshComp->GetComponentRotation());
 
-	OtherHalf->SetWorldLocation(ProcMesh->GetComponentLocation());
-	OtherHalf->SetWorldRotation(ProcMesh->GetComponentRotation());
-
-	// Perform the Slice (keeps one half in ProcMesh and fills OtherHalf)
+	// Perform the Slice
 	UKismetProceduralMeshLibrary::SliceProceduralMesh(
-		ProcMesh,
+		ProcMeshComp,
 		PlanePosition,
 		PlaneNormal,
 		true,
@@ -103,18 +72,20 @@ void ASlicingTarget::Slice(FVector PlanePosition, FVector PlaneNormal)
 		CapMaterial
 	);
 
-	// Recreate physics state for the newly-filled OtherHalf so collision bodies exist
-	OtherHalf->RecreatePhysicsState();
+	// Enable Physics on the New Half
+	OtherHalf->bUseComplexAsSimpleCollision = true; // Use the triangles we just made
+	OtherHalf->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	OtherHalf->SetCollisionObjectType(ECC_PhysicsBody);
 	OtherHalf->SetSimulatePhysics(true);
-	OtherHalf->WakeAllRigidBodies();
 
-	// Ensure original piece has up-to-date physics body and simulation
-	ProcMesh->RecreatePhysicsState();
-	ProcMesh->SetSimulatePhysics(true);
-	ProcMesh->WakeAllRigidBodies();
+	// Re-Enable Physics on the Original Half
+	ProcMeshComp->bUseComplexAsSimpleCollision = true;
+	ProcMeshComp->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	ProcMeshComp->SetCollisionObjectType(ECC_PhysicsBody);
+	ProcMeshComp->SetSimulatePhysics(true);
 
-	// Optional: Add a little impulse
-	FVector ImpulseDir = PlaneNormal * 500.0f;
-	ProcMesh->AddImpulse(ImpulseDir, NAME_None, true);
-	OtherHalf->AddImpulse(-ImpulseDir, NAME_None, true);
+	// Apply Impulse
+	FVector Impulse = PlaneNormal * 500.0f;
+	ProcMeshComp->AddImpulse(Impulse, NAME_None, true);
+	OtherHalf->AddImpulse(-Impulse, NAME_None, true);
 }

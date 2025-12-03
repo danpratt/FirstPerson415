@@ -9,6 +9,7 @@
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraComponent.h"
 #include "PerlinProcTerrain.h"
+#include "SlicingTarget.h"
 
 AFirstPerson415Projectile::AFirstPerson415Projectile() 
 {
@@ -143,6 +144,21 @@ void AFirstPerson415Projectile::OnHit(UPrimitiveComponent* HitComp, AActor* Othe
 			{
 				// If we hit the procedural terrain, alter the mesh at the impact point
 				Terrain->AlterMesh(Hit.ImpactPoint);
+			}
+
+			ASlicingTarget* SlicingTarget = Cast<ASlicingTarget>(OtherActor);
+			if (SlicingTarget)
+			{
+				// Move the slice point slightly INTO the object
+				// This prevents floating point errors where the hit point is technically "outside" the mesh.
+				FVector SlicePos = Hit.ImpactPoint - (Hit.ImpactNormal * 5.0f);
+
+				// Use a Random Plane Normal
+				// Instead of slicing parallel to the face (ImpactNormal), we pick a random direction.
+				// This guarantees a visible, jagged cut through the volume of the cube.
+				FVector SliceNormal = FMath::VRand();
+
+				SlicingTarget->Slice(SlicePos, SliceNormal);
 			}
 		}
 	}
